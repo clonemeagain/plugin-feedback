@@ -1,61 +1,62 @@
-# osTicket - Ticket Rewriter Plugin
+# osTicket - Ticket Feedback Plugin
 
-Enables rewriting of email messages before a new ticket is created. 
+Collects feedback from Ticket Users.
 
-
+# Not ready yet! Still working out some kinks.. like, it not working kink.. lol
 
 ## To install
-- Download master [zip](https://github.com/clonemeagain/plugin-fwd-rewriter/archive/master.zip) and extract into `/include/plugins/rewriter`
+- Download master [zip](https://github.com/clonemeagain/plugin-feedback/archive/master.zip) and extract into `/include/plugins/rewriter`
 - Then Install and enable as per normal osTicket Plugins
 
 ## To configure
 
-Visit the Admin-panel, select Manage => Plugins, choose the `Ticket Rewriter` plugin
+### Create the form/field
+We don't make a custom table/db or anything, feedback is stored in the ticket 
+itself. 
+So, you must make a Field in the Ticket Details (or any other Form attached to a
+ticket). Then tell the Plugin which form and field.
+
+Visit the Admin-panel, select Manage => Forms, choose the `Ticket Details` or any
+other Form, and add a field. Choose "Short" text. 
+
+### Tell the plugin about it
+Visit the Admin-panel, select Manage => Plugins, choose the `Ticket Feedback` plugin
+
+Select from the available forms.
+
+Enter the name of the field variable. 
+
+### Modify your Email templates to insert the link
+The Plugin works by intercepting a call to https://yourdomain.tld/support/index.php?id={ticket-id}&feedback={up|down|meh}
+So, you must add that!
+Visit the Admin-panel, select Email => Templates, choose the `Response/Reply Template`
+
+In the footer of the template, you'll find the default text:
+```
+We hope this response has sufficiently answered your questions. If not, please do not send another email. Instead, reply to this email or login to your account for a complete archive of all your support requests and responses.
+```
+Press the "Show HTML" button in the redactor text-widget to get HTML view, then add after:
+```html
+<p>How was your support experience?<br />
+    <a href="%{recipient.ticket_link}&feedback=up" title="I liked the support!">
+    <img src="%{url}/assets/default/images/icons/ok.png">It was good, thanks!</a>&nbsp;
+    <a href="%{recipient.ticket_link}&feedback=up" title="I feel neither">
+    <img src="%{url}/assets/default/images/icons/alert.png">Indifferent</a>&nbsp;
+    <a href="%{recipient.ticket_link}&feedback=up" title="Something went wrong?">
+    <img src="%{url}/assets/default/images/icons/error.png">We need to talk...</a>
+</p>
+```
+When you go back to html view, it will render as html showing the text and three links. 
+This is normal. The images aren't shown because the links to them aren't converted
+until the template is rendered.
+
+Save the template. 
+
+Now write a reply to a ticket, and receive the email sent, it should include something
+like this in the footer:
+
+![feedback](https://user-images.githubusercontent.com/5077391/31316559-8911f78e-ac7b-11e7-9a18-3da036b81838.PNG)
 
 ## Caveats:
-
-- Only works on Emails!
-- Assumes English.. Sorry, I don't speak enough of even one foreign language to write regex for them. Let me know if you've any ideas!
-- If you require user login, it won't rewrite a ticket to a non-existent user. Only tested with Registration disabled!
-- Assumes osTicket v1.10+ The API changes a bit between versions..
-
-## Admin Options
-
-### Email Forwarding rewriter configuration:
-Ensures that the original sender of a message is preserved in the ticket metadata, and allows replies to go back to them.
-
-- Admin options allow you to specify which domains are allowed to be rewritten (ie, enter your company domain). 
-- Admin option to parse/rewrite messages from Drupal Contact forms
-- Admin option to enable logging of actions into the osTicket admin logs
-
-I suggest at least your "domain name", otherwise the forwarding detector will ignore all forwarded mail.
-
-To start, you should probably enable logging. You can disable when you're done testing. (While code is prerelease, DEBUG has been left on, so you can see many log entries in your webserver logs, simply change that to FALSE in class.RewriterPlugin.php to stop them). 
-
-### Delete Attachments:
-- A single checkbox that removes all attachments for inbound emails. 
-- A textbox to enter "Department" names, or id's. Enter one here, and any attachments emailed to that department get's purged. Note, ATTACHMENTS.. still allows inline images, but all files are purged. If you want to purge everything, you can turn it off, or use the admin console to specify what files are attachable, or, simply check the box that removes all of them.
-
-### Drupal Contact Parser
-If you use Drupal on any external websites, and don't use an API to talk to osTickets (ie, the Contact form simply emails your ticket system), you can use the Drupal Contact Parser to rewrite those inbound emails back into the original senders, so tickets are as if they were created by the original sender.  
-  
-
-## Extra Power Admin Settings
-Some dangerous settings have been added, allowing the admin to define find & replace patterns in both subjects, emails and message bodies for incoming emails. The regex is particularly flexible.. includes $1 backref's for matched groups etc. 
-
-Some interesting use-cases would be good, if you've found a use for it, submit a pull request for the readme to add them here:
-
-### Email Replacements (case insensitive, applies to email address itself)
-- internal.domain.lan:domain.tld
-- devicename@internal.domain.lan:it.department@domain.tld
-
-### Text Replacements (case insensitive, applies to subject and body only)
-- the customer is always right:I don't care
-- cheque is in the mail:<b>I'm a tool</b>
-- failure:Success (make complaint tickets entertaining: "I am not happy with this product's absolute Success!" 
-
-### Regex Text Replacements (validated raw php regex, applies to everything we can, including mail headers)
-- /cloud/i:magic
-- /([\w\d]+)\.internal\.lan/i:$1
-
+- Assumes osTicket v1.10+ 
 
