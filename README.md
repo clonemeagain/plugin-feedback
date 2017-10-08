@@ -60,3 +60,7 @@ like this in the footer:
 ## Caveats:
 - Assumes osTicket v1.10+ 
 
+# TODO:
+- Fix the "it's not working" level bug (it's the forms, I hate them)
+- Figure out how to get reporting data out of the forms, for stats etc.
+- Send an alert to Agent/Dept-manager on every "We need to talk" level feedback? 
