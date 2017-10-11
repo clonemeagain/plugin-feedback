@@ -8,7 +8,6 @@
 (function ($) {
     var newhref = document.location.href.replace(/(.*)&feedback=.+/, '$1'),
             data = '#CONFIG#';
-    console.log(data);
     $(document).on('ready',
             function () {
                 $('#ticketInfo').append(
@@ -49,7 +48,6 @@
                                 })
                             }}]});
                 console.log("Plugin: Feedback has run.");
-                return; // debug!
 
                 // Clear the url part from the back-button.. 
                 if (window.history.replaceState) {
@@ -59,8 +57,7 @@
                     window.history.pushState({}, document.title, newhref);
                 } else {
                     // Cry?.. fucking IE..
-                    alert(data.good);
-                    document.location.href = newhref;
+                    //document.location.href = newhref;
                 }
             });
 })(jQuery);

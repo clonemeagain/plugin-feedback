@@ -44,6 +44,8 @@ class FeedbackPlugin extends Plugin {
             $c                       = $this->getConfig();
             // Send data to the script
             $data                    = new \stdClass();
+            // Actually, if we don't have the ticket ID in the URL, we can fetch it from 
+            // the user session! 
             $data->ticket_id         = filter_input(INPUT_GET, 'id');
             $data->vote              = filter_input(INPUT_GET, 'feedback');
             $data->good              = $c->get('good-text');
@@ -54,17 +56,9 @@ class FeedbackPlugin extends Plugin {
             $data->close_button_text = __('No Thanks');
             $data->status            = $status == TRUE;
             $data->url               = str_replace('feedback=' . $data->vote, 'savefeedback', $_SERVER['REQUEST_URI']);
-
-
-            if (!session_id()) {
-                // hmm.. well
-                error_log("Nah, that's not going to work mate.. fuck.");
-            } else {
-                error_log("A session exists! Winning " . session_id());
-            }
-            $ticket               = Ticket::lookup(array('number' => $data->ticket_id));
-            $data->suggestion     = $this->getSuggestion($ticket);
-            $_SESSION['feedback'] = [];
+            //  $ticket                  = Ticket::lookup(array('number' => $data->ticket_id));
+            $data->suggestion        = $this->getSuggestion($ticket_id);
+            $_SESSION['feedback']    = [];
 
             // Need a way of indicating success/failure without breaking anything..
             // And, hopefully prevents the back button from resubmitting.
@@ -103,41 +97,38 @@ class FeedbackPlugin extends Plugin {
 
     /**
      * Fetches the comments "placeholder" text from the field
-     * @param Ticket $ticket
+     * @param int $ticket
      * @return boolean
      */
-    private function getSuggestion(Ticket $ticket) {
-        $comment_field_id = $this->getConfig()->get('comments-field');
-
+    private function getSuggestion($ticket_id) {
         $fe = DynamicFormEntry::objects()
-                ->filter(array('object_id' => $ticket->getId(), 'object_type' => 'T'));
+                ->filter(array('object_id' => $ticket_id, 'object_type' => 'T'));
         foreach ($fe as $form) {
-            $field = $form->getField($comment_field_id);
+            $field = $form->getField($this->getConfig()->get('comments-field'));
             if (is_null($field)) {
                 continue;
             }
+            return $field->getConfiguration()['placeholder'];
+            //return $form->getTitle();
             //TODO: This doesn't actually work.. :-(
-            $c = $field->get('configuration');
-            if (isset($c['placeholder'])) {
-                return $c['placeholder'];
-            }
+            $c = $form->getConfiguration();
+            return $c;
         }
         return '';
     }
 
     private function saveFeedback() {
-        error_log(print_r($_SESSION, true));
         $token     = filter_input(INPUT_POST, 'token');
         $comments  = filter_input(INPUT_POST, 'text');
         $vote      = filter_input(INPUT_POST, 'vote'); // up/down/meh etc
         $ticket_id = filter_input(INPUT_POST, 'ticket_id');
-        error_log("Attempting to save feedback for $ticket_id of type $vote");
+        $this->log("Attempting to save feedback for $ticket_id of type $vote");
 
 // Validate that the user has access to the ticket.. 
 // which won't happen until AFTER the script has run.. ffs. 
         if ($ticket_id && isset($_SESSION['csrf']['token']) && $_SESSION['csrf']['token'] == $token) {
             // good
-            error_log("Token was right!");
+            $this->log("Token was right!");
         } else {
             return __('Access Denied. Possibly invalid ticket ID');
         }
@@ -145,7 +136,7 @@ class FeedbackPlugin extends Plugin {
         if (!in_array($vote, ['up', 'down', 'meh'])) {
             return __("Invalid feedback");
         }
-        error_log("Vote was ok: $vote");
+        $this->log("Vote was ok: $vote");
         $ticket = Ticket::lookup(['number' => $ticket_id]);
         $config = $this->getConfig();
         if (!$config->get('ticket-form') || !$config->get('feedback-field')) {
@@ -155,13 +146,13 @@ class FeedbackPlugin extends Plugin {
         $feedback_field = $config->get('feedback-field');
         $comments_field = $config->get('comments-field');
 
-        error_log("Looking for fields: feedback: $feedback_field as $vote & comments: $comments_field as $comments");
+        $this->log("Looking for fields: feedback: $feedback_field as $vote & comments: $comments_field as $comments");
 
         if (!$ticket instanceof Ticket) {
             return __('Unable to find that ticket.');
         }
 
-        error_log("Saving feedback for ticket: " . $ticket->getSubject());
+        $this->log("Saving feedback for ticket: " . $ticket->getSubject());
         $fe      = DynamicFormEntry::objects()
                 ->filter(array('object_id' => $ticket->getId(), 'object_type' => 'T'));
         $changed = FALSE;
@@ -186,6 +177,12 @@ class FeedbackPlugin extends Plugin {
             return TRUE;
         }
         return FALSE;
+    }
+
+    private function log($text) {
+        if (DEBUG) {
+            error_log($text);
+        }
     }
 
     /**
