@@ -38,7 +38,7 @@ class FeedbackPluginConfig extends PluginConfig {
         list ($__, $_N) = self::translate();
         // Get list of forms so admin can select Ticket Form, or extra form
         return array(
-            'feedback-field' => new TextboxField([
+            'feedback-field'      => new TextboxField([
                 'label'         => $__('Feedback Field'),
                 'default'       => 'feedback',
                 'hint'          => $__('Create a Short text field in the Ticket Fields form, enter it\'s variable here.'),
@@ -47,7 +47,7 @@ class FeedbackPluginConfig extends PluginConfig {
                     'size'   => 50,
                     'length' => 256
                 )]),
-            'comments-field' => new TextboxField([
+            'comments-field'      => new TextboxField([
                 'label'         => $__('Feedback Comment Field'),
                 'default'       => 'comments',
                 'hint'          => $__('Create a Long Text field in the Ticket Fields form, enter it\'s variable here.'),
@@ -56,7 +56,7 @@ class FeedbackPluginConfig extends PluginConfig {
                     'size'   => 50,
                     'length' => 256
                 )]),
-            'good-text'      => new TextareaField([
+            'good-text'           => new TextareaField([
                 'label'         => $__('Success Message'),
                 'default'       => 'Feedback received, thanks!',
                 'hint'          => $__('Shown when the feedback worked, with a green successful colour.'),
@@ -64,7 +64,7 @@ class FeedbackPluginConfig extends PluginConfig {
                     'html'   => TRUE,
                     'length' => 10000
                 )]),
-            'bad-text'       => new TextareaField([
+            'bad-text'            => new TextareaField([
                 'label'         => $__('Failure Message'),
                 'default'       => 'There was a problem processing your feedback, please try again.',
                 'hint'          => $__('Shown when the feedback failed, with a red colour.'),
@@ -72,21 +72,46 @@ class FeedbackPluginConfig extends PluginConfig {
                     'html'   => TRUE,
                     'length' => 10000
                 )]),
-            'dialog-heading' => new TextboxField(
+            'dialog-heading-up'   => new TextareaField(
                     [
-                'label'         => $__('Dialog Heading'),
-                'default'       => 'Any extra comments are welcome.',
-                'hint'          => $__('What are we saying to the end user to ask for more comments?'),
+                'label'         => $__('Dialog Heading: up'),
+                'default'       => '<h3>Hey, thanks!</h3><p>We\'d really appreciate any extra feedback you might have</p>',
+                'hint'          => $__('Prompt for positive feedback'),
                 'configuration' => array(
                     'html'   => TRUE,
                     'size'   => 100,
                     'length' => 256
                 )]),
-            'details-label'  => new TextboxField(
+            'dialog-heading-meh'  => new TextareaField(
                     [
-                'label'   => $__('Dialog Details label'),
-                'default' => $__('Details')
-                    ]),
+                'label'         => $__('Dialog Heading: meh'),
+                'default'       => '<h3>You\'re not happy? How can we help?</h3><p>We\'d really appreciate your feedback.</p>',
+                'hint'          => $__('Prompt for indifferent feedback'),
+                'configuration' => array(
+                    'html'   => TRUE,
+                    'size'   => 100,
+                    'length' => 256
+                )]),
+            'dialog-heading-down' => new TextareaField(
+                    [
+                'label'         => $__('Dialog Heading: down'),
+                'default'       => '<h3>Oh No! - We could use your help to improve, please, tell us what we can do</h3><p>We really appreciate your feedback.</p>',
+                'hint'          => $__('Prompt for negative feedback'),
+                'configuration' => array(
+                    'html'   => TRUE,
+                    'size'   => 100,
+                    'length' => 256
+                )]),
+            'template'            => new TextareaField([
+                'label'         => $__('Template Definition'),
+                'default'       => '',
+                'configuration' => [
+                    'html'   => FALSE,
+                    'size'   => 100,
+                    'length' => 10000
+                ]
+                    ]
+            ),
         );
     }
 

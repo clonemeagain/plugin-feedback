@@ -50,8 +50,7 @@ class FeedbackPlugin extends Plugin {
             $data->vote              = filter_input(INPUT_GET, 'feedback');
             $data->good              = $c->get('good-text');
             $data->bad               = $c->get('bad-text');
-            $data->dialog_heading    = $c->get('dialog-heading');
-            $data->details_label     = $c->get('details-label');
+            $data->dialog_heading    = $c->get('dialog-heading-' . $data->vote);
             $data->send_button_text  = __('Send');
             $data->close_button_text = __('No Thanks');
             $data->status            = $status == TRUE;
@@ -73,10 +72,12 @@ class FeedbackPlugin extends Plugin {
                 // Inject the data into the script:
                 $data->token = $ost->getCSRFToken();
                 $script      = file_get_contents(__DIR__ . '/replaceStateAndIndicateSuccess.js');
+                $style       = file_get_contents(__DIR__ . '/feedback.css');
                 $javascript  = str_replace("'#CONFIG#'", json_encode($data, JSON_FORCE_OBJECT), $script);
-                print str_replace('</head>', '</head><script type="text/javascript">' . $javascript . '</script></head>', ob_get_clean());
+                print str_replace('</head>', '<style>' . $style . '</style><script type="text/javascript">' . $javascript . '</script></head>', ob_get_clean());
             }, $data);
-        } elseif (isset($_SESSION) && isset($_GET['savefeedback']) && isset($_POST['vote'])) {
+        }
+        elseif (isset($_SESSION) && isset($_GET['savefeedback']) && isset($_POST['vote'])) {
             // Actually save the feedback
             ob_start();
 
@@ -85,7 +86,8 @@ class FeedbackPlugin extends Plugin {
                 $state = $this->saveFeedback();
                 if ($state === TRUE) {
                     Http::response(200, '{}', 'text/json');
-                } else {
+                }
+                else {
                     $response          = new \stdClass();
                     $response->message = $state;
                     Http::response(400, json_encode($response), 'text/json');
@@ -129,7 +131,8 @@ class FeedbackPlugin extends Plugin {
         if ($ticket_id && isset($_SESSION['csrf']['token']) && $_SESSION['csrf']['token'] == $token) {
             // good
             $this->log("Token was right!");
-        } else {
+        }
+        else {
             return __('Access Denied. Possibly invalid ticket ID');
         }
         // TODO: Make configurable
@@ -139,7 +142,7 @@ class FeedbackPlugin extends Plugin {
         $this->log("Vote was ok: $vote");
         $ticket = Ticket::lookup(['number' => $ticket_id]);
         $config = $this->getConfig();
-        if (!$config->get('ticket-form') || !$config->get('feedback-field')) {
+        if (!$config->get('feedback-field')) {
             // this is a failure.. we can't use this yet. 
             return __('Feedback Plugin Error: I haven\'t been configured yet!.');
         }

@@ -10,31 +10,37 @@
             data = '#CONFIG#';
     $(document).on('ready',
             function () {
-                $('#ticketInfo').append(
-                        '<div id="dialog">' + data.dialog_heading +
-                        '<label for="text">' + data.details_label + '</label>' +
-                        '<textarea name="text" value="" placeholder="' + data.suggestion + '" rows="15" cols="80"></textarea>' +
+                var getData = function () {
+                    return {
+                        ticket_id: data.ticket_id,
+                        vote: data.vote,
+                        text: $('#dialog textarea').val(),
+                        token: data.token,
+                    };
+                };
+                $('#ticketInfo').append('<div id="dialog">' +
+                        '<div class="feedback-heading" style="padding:10px;">' + data.dialog_heading + '</div>' +
+                        '<div class="feedback-input" style="margin:10px;"><textarea name="text" value="" placeholder="' + data.suggestion + '"></textarea></div>' +
                         '</div>');
+                // The page has loaded, we're showing the modal, let's save the feedback now, and if they update the input and send, we'll update it.
+                $.ajax({type: 'post', url: data.url, data: getData()});
                 $('#dialog').dialog({
                     modal: true,
-                    height: 400,
-                    minWidth: 582,
+                    height: 410,
+                    minWidth: 592,
                     show: "blind",
                     hide: "blind",
+                    closeText: '', //data.close_button_text,
                     position: {my: "center", at: "center", of: '#ticketInfo'},
                     buttons: [{
                             text: data.send_button_text,
                             icon: "ui-icon-heart",
+                            "class": "feedback-sendButton",
                             click: function () {
                                 $.ajax({
                                     type: 'post',
                                     url: data.url,
-                                    data: {
-                                        ticket_id: data.ticket_id,
-                                        vote: data.vote,
-                                        text: $('#dialog textarea').val(),
-                                        token: data.token,
-                                    },
+                                    data: getData(),
                                     success: function (msg) {
                                         $('#ticketInfo').after('<div style="background-color: lightgreen; border: 1px solid green; padding:10px;">' + data.good + '</div>');
                                     },
@@ -48,7 +54,8 @@
                                 })
                             }}]});
                 console.log("Plugin: Feedback has run.");
-
+                // for debugging, just return here, otherwise you have to keep adding the key
+                return true;
                 // Clear the url part from the back-button.. 
                 if (window.history.replaceState) {
                     //prevents browser from storing history with each change:
