@@ -38,37 +38,51 @@ class FeedbackPluginConfig extends PluginConfig {
         list ($__, $_N) = self::translate();
         // Get list of forms so admin can select Ticket Form, or extra form
         return array(
-            'feedback-field'   => new TextboxField([
-                'label'   => $__('Feedback Field'),
-                'default' => 'feedback',
-                'hint'    => $__('Create a Short text field in the Ticket Fields form, enter it\'s variable here.'),
-                    ]),
+            'feedback-field' => new TextboxField([
+                'label'         => $__('Feedback Field'),
+                'default'       => 'feedback',
+                'hint'          => $__('Create a Short text field in the Ticket Fields form, enter it\'s variable here.'),
+                'configuration' => array(
+                    'html'   => FALSE,
+                    'size'   => 50,
+                    'length' => 256
+                )]),
             'comments-field' => new TextboxField([
-                'label'   => $__('Feedback Comment Field'),
-                'default' => 'comments',
-                'hint'    => $__('Create a Long Text field in the Ticket Fields form, enter it\'s variable here.')
-                    ]),
-            'good-text'        => new TextboxField([
-                'label'   => $__('Success Message'),
-                'default' => 'Feedback received, thanks!',
-                'hint'    => $__('Shown when the feedback worked, with a green successful colour.'),
-                    ]),
-            'bad-text'         => new TextboxField([
-                'label'   => $__('Failure Message'),
-                'default' => 'There was a problem processing your feedback, please try again.',
-                'hint'    => $__('Shown when the feedback failed, with a red colour.'),
-                    ]),
-            'dialog-heading'   => new TextboxField(
+                'label'         => $__('Feedback Comment Field'),
+                'default'       => 'comments',
+                'hint'          => $__('Create a Long Text field in the Ticket Fields form, enter it\'s variable here.'),
+                'configuration' => array(
+                    'html'   => FALSE,
+                    'size'   => 50,
+                    'length' => 256
+                )]),
+            'good-text'      => new TextareaField([
+                'label'         => $__('Success Message'),
+                'default'       => 'Feedback received, thanks!',
+                'hint'          => $__('Shown when the feedback worked, with a green successful colour.'),
+                'configuration' => array(
+                    'html'   => TRUE,
+                    'length' => 10000
+                )]),
+            'bad-text'       => new TextareaField([
+                'label'         => $__('Failure Message'),
+                'default'       => 'There was a problem processing your feedback, please try again.',
+                'hint'          => $__('Shown when the feedback failed, with a red colour.'),
+                'configuration' => array(
+                    'html'   => TRUE,
+                    'length' => 10000
+                )]),
+            'dialog-heading' => new TextboxField(
                     [
                 'label'         => $__('Dialog Heading'),
                 'default'       => 'Any extra comments are welcome.',
                 'hint'          => $__('What are we saying to the end user to ask for more comments?'),
                 'configuration' => array(
                     'html'   => TRUE,
-                    'size'   => 40,
+                    'size'   => 100,
                     'length' => 256
                 )]),
-            'details-label'    => new TextboxField(
+            'details-label'  => new TextboxField(
                     [
                 'label'   => $__('Dialog Details label'),
                 'default' => $__('Details')

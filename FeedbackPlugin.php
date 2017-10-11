@@ -173,6 +173,7 @@ class FeedbackPlugin extends Plugin {
         }
         if ($changed) {
             $form->save();
+            // might want to log the event.. 
             $ticket->logActivity(__('Feedback received: ' . $vote), $comments);
             return TRUE;
         }
