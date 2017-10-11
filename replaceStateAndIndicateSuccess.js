@@ -7,23 +7,15 @@
  */
 (function ($) {
     var newhref = document.location.href.replace(/(.*)&feedback=.+/, '$1'),
-            text = '#CONFIG#';
-
-    $('body').append('<div id="dialog">' + text.dialog_heading +
-            '<form action="tickets.php?id=' + text.ticket_id + '&feedbackcomments" method="POST">' +
-            '<label for="feedbackbox">' + text.details_label + '</label>' +
-            '<textarea name="feedbacktext" id="feedbacktext" value="" placeholder="" rows="15" cols="80"></textarea>' +
-            '</form></div>');
-
-
-    console.log("Plugin: Feedback has run.");
+            data = '#CONFIG#';
+    console.log(data);
     $(document).on('ready',
             function () {
-                if (!text.status) {
-                    $('#ticketInfo').after('<h2 style="background-color: pink; border: 1px solid red; padding:10px;">' + text.bad + '</h2>');
-                } else {
-                    $('#ticketInfo').after('<h2 style="background-color: lightgreen; border: 1px solid green; padding:10px;">' + text.good + '</h2>');
-                }
+                $('#ticketInfo').append(
+                        '<div id="dialog">' + data.dialog_heading +
+                        '<label for="text">' + data.details_label + '</label>' +
+                        '<textarea name="text" value="" placeholder="' + data.suggestion + '" rows="15" cols="80"></textarea>' +
+                        '</div>');
                 $('#dialog').dialog({
                     modal: true,
                     height: 400,
@@ -32,12 +24,31 @@
                     hide: "blind",
                     position: {my: "center", at: "center", of: '#ticketInfo'},
                     buttons: [{
-                            text: text.send_button_text,
+                            text: data.send_button_text,
                             icon: "ui-icon-heart",
                             click: function () {
-                                $('#dialog form').submit();
+                                $.ajax({
+                                    type: 'post',
+                                    url: data.url,
+                                    data: {
+                                        ticket_id: data.ticket_id,
+                                        vote: data.vote,
+                                        text: $('#dialog textarea').val(),
+                                        token: data.token,
+                                    },
+                                    success: function (msg) {
+                                        $('#ticketInfo').after('<h2 style="background-color: lightgreen; border: 1px solid green; padding:10px;">' + data.good + '</h2>');
+                                    },
+                                    error: function (xhr) {
+                                        $('#ticketInfo').after('<h2 style="background-color: pink; border: 1px solid red; padding:10px;">' + data.bad + '</h2>');
+                                        console.log(xhr);
+                                    },
+                                    complete: function () {
+                                        $(".ui-dialog-titlebar-close").click();
+                                    }
+                                })
                             }}]});
-
+                console.log("Plugin: Feedback has run.");
                 return; // debug!
 
                 // Clear the url part from the back-button.. 
@@ -48,7 +59,7 @@
                     window.history.pushState({}, document.title, newhref);
                 } else {
                     // Cry?.. fucking IE..
-                    alert(text.good);
+                    alert(data.good);
                     document.location.href = newhref;
                 }
             });

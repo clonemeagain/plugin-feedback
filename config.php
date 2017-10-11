@@ -43,7 +43,7 @@ class FeedbackPluginConfig extends PluginConfig {
                 'default' => 'feedback',
                 'hint'    => $__('Create a Short text field in the Ticket Fields form, enter it\'s variable here.'),
                     ]),
-            'feedback-comment' => new TextboxField([
+            'comments-field' => new TextboxField([
                 'label'   => $__('Feedback Comment Field'),
                 'default' => 'comments',
                 'hint'    => $__('Create a Long Text field in the Ticket Fields form, enter it\'s variable here.')

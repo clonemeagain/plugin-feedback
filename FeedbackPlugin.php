@@ -1,8 +1,5 @@
 <?php
 
-ini_set('error_reporting', 1);
-ini_set('display_errors', 1);
-
 require_once (INCLUDE_DIR . 'class.format.php');
 require_once (INCLUDE_DIR . 'class.plugin.php');
 require_once (INCLUDE_DIR . 'class.signal.php');
@@ -32,34 +29,23 @@ class FeedbackPlugin extends Plugin {
     const DEBUG = TRUE;
 
     public function bootstrap() {
-
-// This is the sneaky part, we are loaded automatically by
-// the config, but with no signal to fetch, and the 
-// damnable dispatcher so convoluted and broken, we
-// have to get crafty!
-// Do a simple check against the URI, see if we're involved
-// I'm assuming using $feedback_url is outside the global scope
-// for osTicket.. if it breaks, I'm sorry!
-// to trigger this, simply append the ticket_view URL 
-// with &feedback=up&ticket=123
+        /**
+          This is the sneaky part, we are loaded automatically by
+          the config, but with no signal to fetch, and the
+          damnable dispatcher so convoluted and broken, we
+          have to get crafty!
+          So a simple check against the URI, to see if we're involved
+          To trigger simply append the url
+          with &feedback=up&ticket=123
+          The goal of this part is to inject a script that will make
+          a form that will submit the actual vote.
+         */
         if (isset($_GET['id']) && $_GET['id'] && isset($_GET['feedback'])) {
-
-            $ticket_id     = filter_input(INPUT_GET, 'id');
-            $feedback_type = filter_input(INPUT_GET, 'feedback');
-            $errors        = [];
-            $status        = $this->processFeedback($ticket_id, $feedback_type, $errors);
-            error_log("Status: $status");
-//if ($status !== TRUE) {
-// Do'h!
-            error_log("Feedback Error!");
-            error_log($errors['err'] . $status);
-// do we just return now and abandon our efforts?
-// }
-
             $c                       = $this->getConfig();
-// Send data to the script
+            // Send data to the script
             $data                    = new \stdClass();
-            $data->ticket_id         = $ticket_id;
+            $data->ticket_id         = filter_input(INPUT_GET, 'id');
+            $data->vote              = filter_input(INPUT_GET, 'feedback');
             $data->good              = $c->get('good-text');
             $data->bad               = $c->get('bad-text');
             $data->dialog_heading    = $c->get('dialog-heading');
@@ -67,199 +53,137 @@ class FeedbackPlugin extends Plugin {
             $data->send_button_text  = __('Send');
             $data->close_button_text = __('No Thanks');
             $data->status            = $status == TRUE;
+            $data->url               = str_replace('feedback=' . $data->vote, 'savefeedback', $_SERVER['REQUEST_URI']);
 
 
-// Need a way of indicating success/failure without breaking anything..
-// And, hopefully prevents the back button from resubmitting.
-// Let's start caching the output, then we can inject our script into it
+            if (!session_id()) {
+                // hmm.. well
+                error_log("Nah, that's not going to work mate.. fuck.");
+            } else {
+                error_log("A session exists! Winning " . session_id());
+            }
+            $ticket               = Ticket::lookup(array('number' => $data->ticket_id));
+            $data->suggestion     = $this->getSuggestion($ticket);
+            $_SESSION['feedback'] = [];
+
+            // Need a way of indicating success/failure without breaking anything..
+            // And, hopefully prevents the back button from resubmitting.
+            // Let's start caching the output, then we can inject our script into it
             ob_start();
 
-// Can't do anything until the rest has run.. because we need
-// the core code to validate the user etc.. 
-            register_shutdown_function(function ($data, $ticket_id, $feedback_type) {
-
-                $script     = file_get_contents(__DIR__ . '/replaceStateAndIndicateSuccess.js');
-                $javascript = str_replace("'#CONFIG#'", json_encode($data, JSON_FORCE_OBJECT), $script);
+            // Can't do anything until the rest has run.. because we need
+            // the core code to validate the user etc.. 
+            register_shutdown_function(function ($data) {
+                // Persist the user into the session.. ffs.
+                global $ost;
+                // Inject the data into the script:
+                $data->token = $ost->getCSRFToken();
+                $script      = file_get_contents(__DIR__ . '/replaceStateAndIndicateSuccess.js');
+                $javascript  = str_replace("'#CONFIG#'", json_encode($data, JSON_FORCE_OBJECT), $script);
                 print str_replace('</head>', '</head><script type="text/javascript">' . $javascript . '</script></head>', ob_get_clean());
-            }, $data, $ticket_id, $feedback_type);
-        }
-        elseif (isset($_GET['id']) && isset($_GET['feedbackcomments']) && isset($POST['feedbacktext'])) {
-            $ticket_id = filter_input(INPUT_GET, 'id');
-            $comments  = filter_input(INPUT_POST, 'feedbacktext');
-// ok, they had more to say!.. where are we putting it? 
-            $this->saveFeedbackComments($ticket_id, $comments);
-            $dest      = str_replace('feedback=details', '', $_SERVER['REQUEST_URI']);
-            Http::redirect($dest);
-        }
-    }
+            }, $data);
+        } elseif (isset($_SESSION) && isset($_GET['savefeedback']) && isset($_POST['vote'])) {
+            // Actually save the feedback
+            ob_start();
 
-    private function saveFeedbackComments($ticket_id, $comments, &$errors) {
-        $ticket = Ticket::lookup($ticket_id);
-        $config = $this->getConfig();
-        if (!$config->get('ticket-form') || !$config->get('feedback-field')) {
-// this is a failure.. we can't use this yet. 
-            return __('Feedback Plugin Error: I haven\'t been configured yet!.');
-        }
-        $feedback_field = $config->get('comments-field');
-
-// Get all the forms for this ticket:
-// actually log the feedback against the ticket
-        if ($ticket instanceof Ticket) {
-// Build a form as the user would see on the Edit page.. hmm.. They'll need edit access 
-// to the form elements!
-            $fe = DynamicFormEntry::objects()
-                    ->filter(array('object_id' => $ticket->getId(), 'object_type' => 'T'));
-            foreach ($fe as $form) {
-                print "<h1>Checking form: " . $form->getId() . "</h1>";
-                $field = $form->getField($feedback_field);
-                if (is_null($field)) {
-                    continue;
+            register_shutdown_function(function() {
+                ob_get_clean();
+                $state = $this->saveFeedback();
+                if ($state === TRUE) {
+                    Http::response(200, '{}', 'text/json');
+                } else {
+                    $response          = new \stdClass();
+                    $response->message = $state;
+                    Http::response(400, json_encode($response), 'text/json');
                 }
-//Add the first match to the entry.
-                $field->setValue($comments, true);
-                $form->save();
-                $ticket->logEvent('form', array('fields' => [
-                        $feedback_field => 'Comment added']));
-                return TRUE;
-            }
-            /*
-             * Pinched from https://github.com/Micke1101/OSTicket-plugin-Emailform/blob/master/class.EmailformPlugin.php
-             * Can't use it though, as it adds a form for every feedback.. not adding to the existing form.
-             *
-              if (($form = DynamicForm::lookup($config->get('ticket-form')))) {
-
-              //Create a new entry of the form. ?? Why? Why not the original form?
-              $f = $form->instanciate();
-
-              //Assign the entry to the ticket.
-              $f->setTicketId($ticket->getId());
-
-              //Find the first threadentry of ticket (should be the original email).
-              $body = $ticket->getThread()->getEntries()[0]->getBody()->getClean();
-
-              //Iterate over all fields in the entry.
-              foreach ($f->getFields() as $field) {
-
-              //Does the regex designated to the field match anything in the body?
-              if ($config->exists('emailform-' . $field->get('name')) && preg_match("/" . $config->get('emailform-'
-              . $field->get('name')) . "/", $body, $matches)) {
-
-              //Add the first match to the entry.
-              $f->setAnswer($field->get('name'), $matches[0]);
-              }
-              }
-              }
-             */
-
-            /* Pinched from the form user page.. *
-              //Save all changes to the entry to the database.
-              foreach ($forms as $f) {
-              $changes += $f->getChanges();
-              $f->save();
-              }
-              if ($changes) {
-              $ticket->logEvent('feedback_provided', array('fields' => $changes));
-              return TRUE;
-              } */
+                exit();
+            });
         }
-        return FALSE;
     }
 
-    private function processFeedback($ticket_id, $type, &$errors) {
+    /**
+     * Fetches the comments "placeholder" text from the field
+     * @param Ticket $ticket
+     * @return boolean
+     */
+    private function getSuggestion(Ticket $ticket) {
+        $comment_field_id = $this->getConfig()->get('comments-field');
 
-        error_log("Attempting to save feedback for $ticket_id of type $type");
-        global $thisclient, $errors;
-
-// TODO: Make configurable
-        if (!in_array($type, array('up', 'down', 'meh'))) {
-            return "Invalid feedback.. ";
+        $fe = DynamicFormEntry::objects()
+                ->filter(array('object_id' => $ticket->getId(), 'object_type' => 'T'));
+        foreach ($fe as $form) {
+            $field = $form->getField($comment_field_id);
+            if (is_null($field)) {
+                continue;
+            }
+            //TODO: This doesn't actually work.. :-(
+            $c = $field->get('configuration');
+            if (isset($c['placeholder'])) {
+                return $c['placeholder'];
+            }
         }
-        $ticket = Ticket::lookup($ticket_id);
+        return '';
+    }
+
+    private function saveFeedback() {
+        error_log(print_r($_SESSION, true));
+        $token     = filter_input(INPUT_POST, 'token');
+        $comments  = filter_input(INPUT_POST, 'text');
+        $vote      = filter_input(INPUT_POST, 'vote'); // up/down/meh etc
+        $ticket_id = filter_input(INPUT_POST, 'ticket_id');
+        error_log("Attempting to save feedback for $ticket_id of type $vote");
+
 // Validate that the user has access to the ticket.. 
 // which won't happen until AFTER the script has run.. ffs. 
-//  if (!defined('OSTCLIENTINC') || !$thisclient || !$ticket->checkUserAccess($thisclient) //double check perm again!
-//  || $thisclient->getId() != $ticket->getUserId()) {
-// Check copied from /tickets.php in client area, with added null check
-// and defined OSTCLIENTINC check.. just because.
-// return __('Access Denied. Possibly invalid ticket ID');
-// }
-
+        if ($ticket_id && isset($_SESSION['csrf']['token']) && $_SESSION['csrf']['token'] == $token) {
+            // good
+            error_log("Token was right!");
+        } else {
+            return __('Access Denied. Possibly invalid ticket ID');
+        }
+        // TODO: Make configurable
+        if (!in_array($vote, ['up', 'down', 'meh'])) {
+            return __("Invalid feedback");
+        }
+        error_log("Vote was ok: $vote");
+        $ticket = Ticket::lookup(['number' => $ticket_id]);
         $config = $this->getConfig();
         if (!$config->get('ticket-form') || !$config->get('feedback-field')) {
-// this is a failure.. we can't use this yet. 
+            // this is a failure.. we can't use this yet. 
             return __('Feedback Plugin Error: I haven\'t been configured yet!.');
         }
-        $ticket_form_id = $config->get('ticket-form');
         $feedback_field = $config->get('feedback-field');
+        $comments_field = $config->get('comments-field');
 
-// Get all the forms for this ticket:
-//$forms   = DynamicFormEntry::forTicket($ticket->getId());
-//  $changes = array();
-//  foreach ($forms as $form) {
-//     $form->filterFields(function($f) {
-// only get fields we can save: TODO: Figure out how to 
-// filter the fields we get to just the one we want!
-//           return !$f->isStorable();
-//       });
-//   }
-// actually log the feedback against the ticket
-        if ($ticket instanceof Ticket) {
-// Build a form as the user would see on the Edit page.. hmm.. They'll need edit access 
-// to the form elements!
-            $fe = DynamicFormEntry::objects()
-                    ->filter(array('object_id' => $ticket->getId(), 'object_type' => 'T'));
-            foreach ($fe as $form) {
-                print "<h1>Checking form: " . $form->getId() . "</h1>";
-                $field = $form->getField($feedback_field);
-                if (is_null($field)) {
-                    continue;
-                }
-//Add the first match to the entry.
-                $field->setValue($type, true);
-                $form->save();
-                $ticket->logEvent('feedback_provided', array('fields' => [
-                        $feedback_field => $type]));
-                return TRUE;
+        error_log("Looking for fields: feedback: $feedback_field as $vote & comments: $comments_field as $comments");
+
+        if (!$ticket instanceof Ticket) {
+            return __('Unable to find that ticket.');
+        }
+
+        error_log("Saving feedback for ticket: " . $ticket->getSubject());
+        $fe      = DynamicFormEntry::objects()
+                ->filter(array('object_id' => $ticket->getId(), 'object_type' => 'T'));
+        $changed = FALSE;
+        foreach ($fe as $form) {
+            $f_field = $form->getField($feedback_field);
+            if (!is_null($f_field)) {
+                $f_field->setValue($vote, true);
+                $changed = TRUE;
             }
-            /*
-             * Pinched from https://github.com/Micke1101/OSTicket-plugin-Emailform/blob/master/class.EmailformPlugin.php
-             * Can't use it though, as it adds a form for every feedback.. not adding to the existing form.
-             *
-              if (($form = DynamicForm::lookup($config->get('ticket-form')))) {
-
-              //Create a new entry of the form. ?? Why? Why not the original form?
-              $f = $form->instanciate();
-
-              //Assign the entry to the ticket.
-              $f->setTicketId($ticket->getId());
-
-              //Find the first threadentry of ticket (should be the original email).
-              $body = $ticket->getThread()->getEntries()[0]->getBody()->getClean();
-
-              //Iterate over all fields in the entry.
-              foreach ($f->getFields() as $field) {
-
-              //Does the regex designated to the field match anything in the body?
-              if ($config->exists('emailform-' . $field->get('name')) && preg_match("/" . $config->get('emailform-'
-              . $field->get('name')) . "/", $body, $matches)) {
-
-              //Add the first match to the entry.
-              $f->setAnswer($field->get('name'), $matches[0]);
-              }
-              }
-              }
-             */
-
-            /* Pinched from the form user page.. *
-              //Save all changes to the entry to the database.
-              foreach ($forms as $f) {
-              $changes += $f->getChanges();
-              $f->save();
-              }
-              if ($changes) {
-              $ticket->logEvent('feedback_provided', array('fields' => $changes));
-              return TRUE;
-              } */
+        }if ($comments) {
+            foreach ($fe as $form) {
+                $c_field = $form->getField($comments_field);
+                if (!is_null($c_field)) {
+                    $c_field->setValue($comments, true);
+                    $changed = TRUE;
+                }
+            }
+        }
+        if ($changed) {
+            $form->save();
+            $ticket->logActivity(__('Feedback received: ' . $vote), $comments);
+            return TRUE;
         }
         return FALSE;
     }
@@ -275,7 +199,7 @@ class FeedbackPlugin extends Plugin {
         $errors = array();
 // Do we send an email to the admin telling him about the space used by the archive?
         global $ost;
-        $ost->alertAdmin('Plugin: Feedback has been uninstalled', "Forwarded messages will now appear from the forwarder, as with normal email.", true);
+        $ost->alertAdmin(__('Plugin: Feedback has been uninstalled'), __("You don't want to know what they think any more?"), true);
 
         parent::uninstall($errors);
     }
