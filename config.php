@@ -37,24 +37,41 @@ class FeedbackPluginConfig extends PluginConfig {
     function getOptions() {
         list ($__, $_N) = self::translate();
         // Get list of forms so admin can select Ticket Form, or extra form
-        $forms = array();
-        foreach (DynamicForm::objects() as $f) {
-            $forms[$f->getId()] = $f->getTitle();
-        }
-
         return array(
-            'ticket-form' . $i => new ChoiceField(
-                    [
-                'label' => $__('Ticket Form'),
-                'choices' => $forms,
-                'default' => 1,
-                'hint' => $__(
-                        'Select the form where you made your feedback field')
+            'feedback-field'   => new TextboxField([
+                'label'   => $__('Feedback Field'),
+                'default' => 'feedback',
+                'hint'    => $__('Create a Short text field in the Ticket Fields form, enter it\'s variable here.'),
                     ]),
-            'feedback-field' => new TextboxField([
-                'label' => $__('Feedback Field'),
-                'default' => '',
-                'hint' => $__('Enter the variable name you chose when making the field.'),
+            'feedback-comment' => new TextboxField([
+                'label'   => $__('Feedback Comment Field'),
+                'default' => 'comments',
+                'hint'    => $__('Create a Long Text field in the Ticket Fields form, enter it\'s variable here.')
+                    ]),
+            'good-text'        => new TextboxField([
+                'label'   => $__('Success Message'),
+                'default' => 'Feedback received, thanks!',
+                'hint'    => $__('Shown when the feedback worked, with a green successful colour.'),
+                    ]),
+            'bad-text'         => new TextboxField([
+                'label'   => $__('Failure Message'),
+                'default' => 'There was a problem processing your feedback, please try again.',
+                'hint'    => $__('Shown when the feedback failed, with a red colour.'),
+                    ]),
+            'dialog-heading'   => new TextboxField(
+                    [
+                'label'         => $__('Dialog Heading'),
+                'default'       => 'Any extra comments are welcome.',
+                'hint'          => $__('What are we saying to the end user to ask for more comments?'),
+                'configuration' => array(
+                    'html'   => TRUE,
+                    'size'   => 40,
+                    'length' => 256
+                )]),
+            'details-label'    => new TextboxField(
+                    [
+                'label'   => $__('Dialog Details label'),
+                'default' => $__('Details')
                     ]),
         );
     }
