@@ -36,10 +36,10 @@
                                         token: data.token,
                                     },
                                     success: function (msg) {
-                                        $('#ticketInfo').after('<h2 style="background-color: lightgreen; border: 1px solid green; padding:10px;">' + data.good + '</h2>');
+                                        $('#ticketInfo').after('<div style="background-color: lightgreen; border: 1px solid green; padding:10px;">' + data.good + '</div>');
                                     },
                                     error: function (xhr) {
-                                        $('#ticketInfo').after('<h2 style="background-color: pink; border: 1px solid red; padding:10px;">' + data.bad + '</h2>');
+                                        $('#ticketInfo').after('<div style="background-color: pink; border: 1px solid red; padding:10px;">' + data.bad + '</div>');
                                         console.log(xhr);
                                     },
                                     complete: function () {
