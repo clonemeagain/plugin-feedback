@@ -19,18 +19,18 @@ itself.
 So, you must make two Fields in the Ticket Details Form. Then tell the Plugin what 
 variables you used for them.
 
-Visit the Admin-panel, select Manage => Forms, choose the `Ticket Details` or any
-other Form, and add a field. Choose "Short" text. 
+Visit the Admin-panel, select Manage => Forms, choose the `Ticket Details`, and add a field. Choose "Choices" for `Feedback` & Long text for `Comments`
 ![field-config-screen-1](https://user-images.githubusercontent.com/5077391/31494557-822dcaf2-af9f-11e7-8209-f827a51324cb.PNG)
 
+#### Configure the Feedback Field
 ![field-config-screen-2-feedback-choice-config-page-1](https://user-images.githubusercontent.com/5077391/31494554-819a298c-af9f-11e7-831f-5e56b24be7ee.PNG)
 ![field-config-screen-2-feedback-choice-config-page-2](https://user-images.githubusercontent.com/5077391/31494555-81cbb380-af9f-11e7-92e9-f2a111ca1242.PNG)
 
+#### Configure the Comments Field
 ![field-config-screen-2-comments-config-page-1](https://user-images.githubusercontent.com/5077391/31494558-825e35d4-af9f-11e7-9b4e-c2b9a17aacf4.PNG)
 ![field-config-screen-2-comments-config-page-2](https://user-images.githubusercontent.com/5077391/31494559-82907742-af9f-11e7-8e89-fdc3de18435a.PNG)
 
-
-### Tell the plugin about it
+### Tell the plugin the variable names
 Visit the Admin-panel, select Manage => Plugins, choose the `Ticket Feedback` plugin
 ![field-config-screen-3](https://user-images.githubusercontent.com/5077391/31494556-81fb69b8-af9f-11e7-91d3-06202207356b.png)
 
