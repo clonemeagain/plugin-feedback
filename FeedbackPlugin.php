@@ -1,16 +1,15 @@
 <?php
 
-require_once (INCLUDE_DIR . 'class.format.php');
+/**
+ * The goal of this Plugin is to receive up or downvotes etc 
+ * on the end-users perspective of their support experience. 
+ */
 require_once (INCLUDE_DIR . 'class.plugin.php');
 require_once (INCLUDE_DIR . 'class.signal.php');
-require_once (INCLUDE_DIR . 'class.message.php');
 require_once ('config.php');
 
 /**
- * The goal of this Plugin is to receive up or downvotes etc 
- * on the end-users perspective of the support experience. 
- * 
- * Could be used as a trivial "poll" of each ticket etc. 
+ * Implementation of the Plugin class
  */
 class FeedbackPlugin extends Plugin {
 
@@ -139,7 +138,7 @@ class FeedbackPlugin extends Plugin {
             'object_id'   => $t->getId(),
             'object_type' => 'T'
         ]);
-        //$fe is an interable QuerySet.. not an array!
+        //$fe is an iterable QuerySet.. not an array!
         foreach ($fe as $form) {
             $field = $form->getField($this->getConfig()->get('feedback-field'));
             if ($field) {
@@ -157,6 +156,7 @@ class FeedbackPlugin extends Plugin {
      * @return boolean
      */
     private function saveFeedback() {
+        // Fetch what the User entered/selected:
         $token     = filter_input(INPUT_POST, 'token');
         $comments  = filter_input(INPUT_POST, 'text');
         $vote      = filter_input(INPUT_POST, 'vote'); // up/down/meh etc
@@ -174,10 +174,12 @@ class FeedbackPlugin extends Plugin {
         } else {
             return __('Access Denied. Possibly invalid ticket ID');
         }
+        // Validate the Ticket:
         $ticket = Ticket::lookup(['number' => $ticket_id]);
         if (!$ticket instanceof Ticket) {
             return __('Unable to find that ticket.');
         }
+        // Validate the Plugin Config:
         $config = $this->getConfig();
         if (!$config->get('feedback-field')) {
             // this is a failure.. we can't use this yet. 
@@ -185,13 +187,15 @@ class FeedbackPlugin extends Plugin {
         }
         $feedback_field_name = $config->get('feedback-field');
         $comment_field_name  = $config->get('comments-field');
-        $this->log("Saving feedback for ticket: " . $ticket->getSubject());
-        $fe                  = DynamicFormEntry::objects()->filter([
+
+        // Load the Ticket's form:
+        $fe      = DynamicFormEntry::objects()->filter([
             'object_id'   => $ticket->getId(),
             'object_type' => 'T'
         ]);
-        $changed             = FALSE;
-        //$fe is an interable QuerySet.. not an array!
+        $changed = FALSE;
+        // Find the feedback field and set the vote choice
+        //$fe is an iterable QuerySet.. not an array!
         foreach ($fe as $form) {
             $field_feedback = $form->getField($feedback_field_name);
             if ($field_feedback) {
@@ -205,7 +209,7 @@ class FeedbackPlugin extends Plugin {
                 }
             }
         }
-        //$fe is an interable QuerySet.. not an array!
+        // Save the comment text
         foreach ($fe as $form) {
             $field_comment = $form->getField($comment_field_name);
             if ($field_comment) {

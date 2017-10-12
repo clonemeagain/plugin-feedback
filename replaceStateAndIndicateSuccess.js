@@ -5,9 +5,16 @@
  * Also, injects the status of the feedback into the page, and shows
  * a "More details" box for extra details. 
  */
+// Clear the url part from the back-button.. 
+// ergo: View Source won't show this script
+var newhref = document.location.href.replace(/(.*)&feedback=.+/, '$1');
+if (window.history.replaceState) {
+    //prevents browser from storing history with each change:
+    window.history.replaceState({}, document.title, newhref); // we were never here..
+    window.history.pushState({}, document.title, newhref);
+}
 (function ($) {
-    var newhref = document.location.href.replace(/(.*)&feedback=.+/, '$1'),
-            data = '#CONFIG#';
+    var data = '#CONFIG#';
     $(document).on('ready',
             function () {
                 var getData = function () {
@@ -75,15 +82,5 @@
                     }
                 });
                 console.log("Plugin: Feedback has run.");
-                // for debugging, just return here, otherwise you have to keep adding the key
-                return true;
-                // Clear the url part from the back-button.. 
-                // ergo: View Source won't show this
-                if (window.history.replaceState) {
-                    //prevents browser from storing history with each change:
-                    // not 100% that this actually works.. 
-                    window.history.replaceState({}, document.title, newhref); // we were never here..
-                    window.history.pushState({}, document.title, newhref);
-                }
             });
 })(jQuery);
