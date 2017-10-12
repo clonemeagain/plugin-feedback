@@ -104,7 +104,14 @@ class FeedbackPluginConfig extends PluginConfig {
                 )]),
             'template'            => new TextareaField([
                 'label'         => $__('Template Definition'),
-                'default'       => '',
+                'default'       => '<p>How was your support experience?<br />
+    <a href="%{recipient.ticket_link}&feedback=up" title="I liked the support!">
+    <img src="%{url}/assets/default/images/icons/ok.png">It was good, thanks!</a>&nbsp;
+    <a href="%{recipient.ticket_link}&feedback=meh" title="I feel neither">
+    <img src="%{url}/assets/default/images/icons/alert.png">Indifferent</a>&nbsp;
+    <a href="%{recipient.ticket_link}&feedback=down" title="Something went wrong?">
+    <img src="%{url}/assets/default/images/icons/error.png">We need to talk...</a>
+</p>', 'hint'          => $__('Apply osTicket pull-request 3111 then you can use the above as variable %{feedback} in your Canned Responses and Ticket Templates.'),
                 'configuration' => [
                     'html'   => FALSE,
                     'size'   => 100,

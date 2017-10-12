@@ -1,5 +1,9 @@
 <?php
 
+if($ost instanceof osTicket){
+    error_log("We could be in businesses");
+}
+
 return array(
     'id' => 'clonemeagain:rewriter', # notrans
     'version' => '0.1',

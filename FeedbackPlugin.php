@@ -40,61 +40,79 @@ class FeedbackPlugin extends Plugin {
           The goal of this part is to inject a script that will make
           a form that will submit the actual vote.
          */
-        if (isset($_GET['id']) && $_GET['id'] && isset($_GET['feedback'])) {
-            $c                       = $this->getConfig();
-            // Send data to the script
-            $data                    = new \stdClass();
-            // Actually, if we don't have the ticket ID in the URL, we can fetch it from 
-            // the user session! 
-            $data->ticket_id         = filter_input(INPUT_GET, 'id');
-            $data->vote              = filter_input(INPUT_GET, 'feedback');
-            $data->good              = $c->get('good-text');
-            $data->bad               = $c->get('bad-text');
-            $data->dialog_heading    = $c->get('dialog-heading-' . $data->vote);
-            $data->send_button_text  = __('Send');
-            $data->close_button_text = __('No Thanks');
-            $data->status            = $status == TRUE;
-            $data->url               = str_replace('feedback=' . $data->vote, 'savefeedback', $_SERVER['REQUEST_URI']);
-            //  $ticket                  = Ticket::lookup(array('number' => $data->ticket_id));
-            $data->suggestion        = $this->getSuggestion($ticket_id);
-            $_SESSION['feedback']    = [];
-
-            // Need a way of indicating success/failure without breaking anything..
-            // And, hopefully prevents the back button from resubmitting.
-            // Let's start caching the output, then we can inject our script into it
-            ob_start();
-
-            // Can't do anything until the rest has run.. because we need
-            // the core code to validate the user etc.. 
-            register_shutdown_function(function ($data) {
-                // Persist the user into the session.. ffs.
-                global $ost;
-                // Inject the data into the script:
-                $data->token = $ost->getCSRFToken();
-                $script      = file_get_contents(__DIR__ . '/replaceStateAndIndicateSuccess.js');
-                $style       = file_get_contents(__DIR__ . '/feedback.css');
-                $javascript  = str_replace("'#CONFIG#'", json_encode($data, JSON_FORCE_OBJECT), $script);
-                print str_replace('</head>', '<style>' . $style . '</style><script type="text/javascript">' . $javascript . '</script></head>', ob_get_clean());
-            }, $data);
+        if (isset($_GET['feedback']) && isset($_SESSION['_auth']['user-ticket'])) {
+            $this->doShowAction();
         }
         elseif (isset($_SESSION) && isset($_GET['savefeedback']) && isset($_POST['vote'])) {
-            // Actually save the feedback
-            ob_start();
-
-            register_shutdown_function(function() {
-                ob_get_clean();
-                $state = $this->saveFeedback();
-                if ($state === TRUE) {
-                    Http::response(200, '{}', 'text/json');
-                }
-                else {
-                    $response          = new \stdClass();
-                    $response->message = $state;
-                    Http::response(400, json_encode($response), 'text/json');
-                }
-                exit();
+            $this->doSaveAction();
+        }
+        else {
+            // Let's load up our addition to the ticket variables.. 
+            Signal::connect('replace.variables', function($replacer, &$data) {
+                $data['feedback'] = $this->getConfig()->get('template');
             });
         }
+    }
+
+    private function doShowAction() {
+        $c               = $this->getConfig();
+        // Send data to the script
+        $data            = new \stdClass();
+        // Actually, if we don't have the ticket ID in the URL, we can fetch it from 
+        // the user session! 
+        $data->ticket_id = filter_input(INPUT_GET, 'id');
+
+        if (!$data->ticket_id) {
+            // doh, we don't have the ticket id from the url, we might be able to fake it from the session
+            // todo: Validate that is the correct path
+            $data->ticket_id = $_SESSION['_auth']['user-ticket'];
+        }
+
+        $data->vote              = filter_input(INPUT_GET, 'feedback');
+        $data->good              = $c->get('good-text');
+        $data->bad               = $c->get('bad-text');
+        $data->dialog_heading    = $c->get('dialog-heading-' . $data->vote);
+        $data->send_button_text  = __('Send');
+        $data->close_button_text = __('No Thanks');
+        $data->url               = str_replace('feedback=' . $data->vote, 'savefeedback', $_SERVER['REQUEST_URI']);
+        //  $ticket                  = Ticket::lookup(array('number' => $data->ticket_id));
+        $data->suggestion        = $this->getSuggestion($data->ticket_id);
+
+        // Need a way of indicating success/failure without breaking anything..
+        // And, hopefully prevents the back button from resubmitting.
+        // Let's start caching the output, then we can inject our script into it
+        ob_start();
+
+        // Can't do anything until the rest has run.. because we need
+        // the core code to validate the user etc.. 
+        register_shutdown_function(function ($data) {
+            // Persist the user into the session.. ffs.
+            global $ost;
+            // Inject the data into the script:
+            $data->token = $ost->getCSRFToken();
+            $script      = file_get_contents(__DIR__ . '/replaceStateAndIndicateSuccess.js');
+            $style       = file_get_contents(__DIR__ . '/feedback.css');
+            $javascript  = str_replace("'#CONFIG#'", json_encode($data, JSON_FORCE_OBJECT), $script);
+            print str_replace('</head>', '<style>' . $style . '</style><script type="text/javascript">' . $javascript . '</script></head>', ob_get_clean());
+        }, $data);
+    }
+
+    private function doSaveAction() {
+        // Actually save the feedback
+        ob_start();
+        register_shutdown_function(function() {
+            ob_get_clean(); // Discard whatever error message osTicket would generate for our phony POST action
+            $state = $this->saveFeedback();
+            if ($state === TRUE) {
+                Http::response(200, '{}', 'text/json');
+            }
+            else {
+                $response          = new \stdClass();
+                $response->message = $state;
+                Http::response(400, json_encode($response), 'text/json');
+            }
+            exit();
+        });
     }
 
     /**
@@ -103,18 +121,21 @@ class FeedbackPlugin extends Plugin {
      * @return boolean
      */
     private function getSuggestion($ticket_id) {
+        $t = Ticket::lookup(['number' => $ticket_id]);
+        if (!$t instanceof Ticket) {
+            return '';
+        }
         $fe = DynamicFormEntry::objects()
-                ->filter(array('object_id' => $ticket_id, 'object_type' => 'T'));
+                ->filter([
+            'object_id'   => $t->getId(),
+            'object_type' => 'T'
+        ]);
         foreach ($fe as $form) {
             $field = $form->getField($this->getConfig()->get('comments-field'));
             if (is_null($field)) {
                 continue;
             }
             return $field->getConfiguration()['placeholder'];
-            //return $form->getTitle();
-            //TODO: This doesn't actually work.. :-(
-            $c = $form->getConfiguration();
-            return $c;
         }
         return '';
     }
@@ -124,6 +145,9 @@ class FeedbackPlugin extends Plugin {
         $comments  = filter_input(INPUT_POST, 'text');
         $vote      = filter_input(INPUT_POST, 'vote'); // up/down/meh etc
         $ticket_id = filter_input(INPUT_POST, 'ticket_id');
+        if (!$ticket_id) {
+            $ticket_id = $_SESSION['user-ticket'];
+        }
         $this->log("Attempting to save feedback for $ticket_id of type $vote");
 
 // Validate that the user has access to the ticket.. 
