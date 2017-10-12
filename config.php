@@ -38,10 +38,13 @@ class FeedbackPluginConfig extends PluginConfig {
         list ($__, $_N) = self::translate();
         // Get list of forms so admin can select Ticket Form, or extra form
         return array(
+            'sb-1'                => new SectionBreakField([
+                'label' => $__('Form Field Configuration'),
+                'hint'  => $__('Read the README for help setting this up.')]),
             'feedback-field'      => new TextboxField([
                 'label'         => $__('Feedback Field'),
                 'default'       => 'feedback',
-                'hint'          => $__('Create a Short text field in the Ticket Fields form, enter it\'s variable here.'),
+                'hint'          => $__('Create a Choices field in the Ticket Fields form, enter it\'s variable name here, use three options: "up, meh, down" with : between them and the local name, ie: up:Great each on a new line.'),
                 'configuration' => array(
                     'html'   => FALSE,
                     'size'   => 50,
@@ -56,6 +59,48 @@ class FeedbackPluginConfig extends PluginConfig {
                     'size'   => 50,
                     'length' => 256
                 )]),
+            'sb-2'                => new SectionBreakField([
+                'label' => $__('Dialog Headings'),
+                'hint'  => $__('Custom prompts responding to the link clicked.')]),
+            'dialog-heading-up'   => new TextareaField(
+                    [
+                'label'         => $__('Dialog Heading: up'),
+                'default'       => '<h3>Hey, thanks!</h3><p>We\'d really appreciate any extra feedback you might have</p>',
+                'hint'          => $__('Prompt for positive feedback'),
+                'configuration' => array(
+                    'html'   => TRUE,
+                    'size'   => 100,
+                    'length' => 256,
+                    'cols'   => 40,
+                    'rows'   => 10,
+                )]),
+            'dialog-heading-meh'  => new TextareaField(
+                    [
+                'label'         => $__('Dialog Heading: meh'),
+                'default'       => '<h3>You\'re not happy? How can we help?</h3><p>We\'d really appreciate your feedback.</p>',
+                'hint'          => $__('Prompt for indifferent feedback'),
+                'configuration' => array(
+                    'html'   => TRUE,
+                    'size'   => 100,
+                    'length' => 256,
+                    'cols'   => 40,
+                    'rows'   => 10,
+                )]),
+            'dialog-heading-down' => new TextareaField(
+                    [
+                'label'         => $__('Dialog Heading: down'),
+                'default'       => '<h3>Oh No! - We could use your help to improve, please, tell us what we can do</h3><p>We really appreciate your feedback.</p>',
+                'hint'          => $__('Prompt for negative feedback'),
+                'configuration' => array(
+                    'html'   => TRUE,
+                    'size'   => 100,
+                    'length' => 256,
+                    'cols'   => 40,
+                    'rows'   => 10,
+                )]),
+            'sb-3'                => new SectionBreakField([
+                'label' => $__('Final Message Configuration'),
+                'hint'  => $__('What we say to them after they submit the form.')]),
             'good-text'           => new TextareaField([
                 'label'         => $__('Success Message'),
                 'default'       => 'Feedback received, thanks!',
@@ -72,36 +117,9 @@ class FeedbackPluginConfig extends PluginConfig {
                     'html'   => TRUE,
                     'length' => 10000
                 )]),
-            'dialog-heading-up'   => new TextareaField(
-                    [
-                'label'         => $__('Dialog Heading: up'),
-                'default'       => '<h3>Hey, thanks!</h3><p>We\'d really appreciate any extra feedback you might have</p>',
-                'hint'          => $__('Prompt for positive feedback'),
-                'configuration' => array(
-                    'html'   => TRUE,
-                    'size'   => 100,
-                    'length' => 256
-                )]),
-            'dialog-heading-meh'  => new TextareaField(
-                    [
-                'label'         => $__('Dialog Heading: meh'),
-                'default'       => '<h3>You\'re not happy? How can we help?</h3><p>We\'d really appreciate your feedback.</p>',
-                'hint'          => $__('Prompt for indifferent feedback'),
-                'configuration' => array(
-                    'html'   => TRUE,
-                    'size'   => 100,
-                    'length' => 256
-                )]),
-            'dialog-heading-down' => new TextareaField(
-                    [
-                'label'         => $__('Dialog Heading: down'),
-                'default'       => '<h3>Oh No! - We could use your help to improve, please, tell us what we can do</h3><p>We really appreciate your feedback.</p>',
-                'hint'          => $__('Prompt for negative feedback'),
-                'configuration' => array(
-                    'html'   => TRUE,
-                    'size'   => 100,
-                    'length' => 256
-                )]),
+            'sb-4'                => new SectionBreakField([
+                'label' => $__('Template Configuration'),
+                'hint'  => $__('This part configures the Template Variable.')]),
             'template'            => new TextareaField([
                 'label'         => $__('Template Definition'),
                 'default'       => '<p>How was your support experience?<br />
@@ -115,7 +133,9 @@ class FeedbackPluginConfig extends PluginConfig {
                 'configuration' => [
                     'html'   => FALSE,
                     'size'   => 100,
-                    'length' => 10000
+                    'length' => 10000,
+                    'cols'   => 80,
+                    'rows'   => 10,
                 ]
                     ]
             ),

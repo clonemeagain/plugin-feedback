@@ -1,16 +1,15 @@
 <?php
 
-require_once (INCLUDE_DIR . 'class.format.php');
+/**
+ * The goal of this Plugin is to receive up or downvotes etc 
+ * on the end-users perspective of their support experience. 
+ */
 require_once (INCLUDE_DIR . 'class.plugin.php');
 require_once (INCLUDE_DIR . 'class.signal.php');
-require_once (INCLUDE_DIR . 'class.message.php');
 require_once ('config.php');
 
 /**
- * The goal of this Plugin is to receive up or downvotes etc 
- * on the end-users perspective of the support experience. 
- * 
- * Could be used as a trivial "poll" of each ticket etc. 
+ * Implementation of the Plugin class
  */
 class FeedbackPlugin extends Plugin {
 
@@ -42,12 +41,11 @@ class FeedbackPlugin extends Plugin {
          */
         if (isset($_GET['feedback']) && isset($_SESSION['_auth']['user-ticket'])) {
             $this->doShowAction();
-        }
-        elseif (isset($_SESSION) && isset($_GET['savefeedback']) && isset($_POST['vote'])) {
+        } elseif (isset($_SESSION) && isset($_GET['savefeedback']) && isset($_POST['vote'])) {
             $this->doSaveAction();
-        }
-        else {
+        } else {
             // Let's load up our addition to the ticket variables.. 
+            // assumes the pull request has been loaded.. but.. shit.
             Signal::connect('replace.variables', function($replacer, &$data) {
                 $data['feedback'] = $this->getConfig()->get('template');
             });
@@ -67,16 +65,18 @@ class FeedbackPlugin extends Plugin {
             // todo: Validate that is the correct path
             $data->ticket_id = $_SESSION['_auth']['user-ticket'];
         }
+        $data->vote             = filter_input(INPUT_GET, 'feedback');
+        $data->good             = $c->get('good-text');
+        $data->bad              = $c->get('bad-text');
+        $data->dialog_heading   = $c->get('dialog-heading-' . $data->vote);
+        $data->send_button_text = __('Send');
+        $data->url              = str_replace('feedback=' . $data->vote, 'savefeedback', $_SERVER['REQUEST_URI']);
 
-        $data->vote              = filter_input(INPUT_GET, 'feedback');
-        $data->good              = $c->get('good-text');
-        $data->bad               = $c->get('bad-text');
-        $data->dialog_heading    = $c->get('dialog-heading-' . $data->vote);
-        $data->send_button_text  = __('Send');
-        $data->close_button_text = __('No Thanks');
-        $data->url               = str_replace('feedback=' . $data->vote, 'savefeedback', $_SERVER['REQUEST_URI']);
-        //  $ticket                  = Ticket::lookup(array('number' => $data->ticket_id));
-        $data->suggestion        = $this->getSuggestion($data->ticket_id);
+        // Ok, now we need to get the field config for the choice, use the
+        // display names as the labels and build radio buttons
+        // because I just saw a great feedback form and want to 
+        // emulate it.. it was beautiful!
+        $data->options = $this->getFormOptions($data->ticket_id);
 
         // Need a way of indicating success/failure without breaking anything..
         // And, hopefully prevents the back button from resubmitting.
@@ -105,8 +105,7 @@ class FeedbackPlugin extends Plugin {
             $state = $this->saveFeedback();
             if ($state === TRUE) {
                 Http::response(200, '{}', 'text/json');
-            }
-            else {
+            } else {
                 $response          = new \stdClass();
                 $response->message = $state;
                 Http::response(400, json_encode($response), 'text/json');
@@ -120,27 +119,44 @@ class FeedbackPlugin extends Plugin {
      * @param int $ticket
      * @return boolean
      */
-    private function getSuggestion($ticket_id) {
-        $t = Ticket::lookup(['number' => $ticket_id]);
+    private function getFormOptions($ticket_id) {
+        // Setup the default options:
+        $options = [
+            'help' => '',
+            'up'   => __('Great'),
+            'meh'  => __('Okay'),
+            'down' => __('Not Good'),
+        ];
+        // Get the Ticket from the User number (not the id, the number):
+        $t       = Ticket::lookup(['number' => $ticket_id]);
         if (!$t instanceof Ticket) {
-            return '';
+            return $options;
         }
+        // Get the form for the Ticket:
         $fe = DynamicFormEntry::objects()
                 ->filter([
             'object_id'   => $t->getId(),
             'object_type' => 'T'
         ]);
+        //$fe is an iterable QuerySet.. not an array!
         foreach ($fe as $form) {
-            $field = $form->getField($this->getConfig()->get('comments-field'));
-            if (is_null($field)) {
-                continue;
+            $field = $form->getField($this->getConfig()->get('feedback-field'));
+            if ($field) {
+                $options = $field->getChoices();
             }
-            return $field->getConfiguration()['placeholder'];
         }
-        return '';
+        $options ['placeholder'] = __('Message');
+        return $options;
     }
 
+    /**
+     * Connects to a Ticket's form, saves the feedback
+     * we received into the Configured Fields.
+     * 
+     * @return boolean
+     */
     private function saveFeedback() {
+        // Fetch what the User entered/selected:
         $token     = filter_input(INPUT_POST, 'token');
         $comments  = filter_input(INPUT_POST, 'text');
         $vote      = filter_input(INPUT_POST, 'vote'); // up/down/meh etc
@@ -150,58 +166,61 @@ class FeedbackPlugin extends Plugin {
         }
         $this->log("Attempting to save feedback for $ticket_id of type $vote");
 
-// Validate that the user has access to the ticket.. 
-// which won't happen until AFTER the script has run.. ffs. 
+        // Validate that the user has access to the ticket.. 
+        // which won't happen until AFTER the script has run.. ffs. 
         if ($ticket_id && isset($_SESSION['csrf']['token']) && $_SESSION['csrf']['token'] == $token) {
             // good
             $this->log("Token was right!");
-        }
-        else {
+        } else {
             return __('Access Denied. Possibly invalid ticket ID');
         }
-        // TODO: Make configurable
-        if (!in_array($vote, ['up', 'down', 'meh'])) {
-            return __("Invalid feedback");
-        }
-        $this->log("Vote was ok: $vote");
+        // Validate the Ticket:
         $ticket = Ticket::lookup(['number' => $ticket_id]);
+        if (!$ticket instanceof Ticket) {
+            return __('Unable to find that ticket.');
+        }
+        // Validate the Plugin Config:
         $config = $this->getConfig();
         if (!$config->get('feedback-field')) {
             // this is a failure.. we can't use this yet. 
             return __('Feedback Plugin Error: I haven\'t been configured yet!.');
         }
-        $feedback_field = $config->get('feedback-field');
-        $comments_field = $config->get('comments-field');
+        $feedback_field_name = $config->get('feedback-field');
+        $comment_field_name  = $config->get('comments-field');
 
-        $this->log("Looking for fields: feedback: $feedback_field as $vote & comments: $comments_field as $comments");
-
-        if (!$ticket instanceof Ticket) {
-            return __('Unable to find that ticket.');
-        }
-
-        $this->log("Saving feedback for ticket: " . $ticket->getSubject());
-        $fe      = DynamicFormEntry::objects()
-                ->filter(array('object_id' => $ticket->getId(), 'object_type' => 'T'));
+        // Load the Ticket's form:
+        $fe      = DynamicFormEntry::objects()->filter([
+            'object_id'   => $ticket->getId(),
+            'object_type' => 'T'
+        ]);
         $changed = FALSE;
+        // Find the feedback field and set the vote choice
+        //$fe is an iterable QuerySet.. not an array!
         foreach ($fe as $form) {
-            $f_field = $form->getField($feedback_field);
-            if (!is_null($f_field)) {
-                $f_field->setValue($vote, true);
-                $changed = TRUE;
-            }
-        }if ($comments) {
-            foreach ($fe as $form) {
-                $c_field = $form->getField($comments_field);
-                if (!is_null($c_field)) {
-                    $c_field->setValue($comments, true);
+            $field_feedback = $form->getField($feedback_field_name);
+            if ($field_feedback) {
+                $choices = $field_feedback->getChoices();
+                if (isset($choices[$vote])) {
+                    $ticket->logActivity(__('Feedback received') . ': ' . $choices[$vote], $comments);
+                    $field_feedback->setValue($vote, true);
                     $changed = TRUE;
+                } else {
+                    return __("Invalid feedback.. ");
                 }
             }
         }
+        // Save the comment text
+        foreach ($fe as $form) {
+            $field_comment = $form->getField($comment_field_name);
+            if ($field_comment) {
+                $field_comment->setValue($comments, true);
+                $changed = TRUE;
+            }
+        }
+
         if ($changed) {
             $form->save();
-            // might want to log the event.. 
-            $ticket->logActivity(__('Feedback received: ' . $vote), $comments);
+            // might want to log the event.. is it an event? Probably.. 
             return TRUE;
         }
         return FALSE;
@@ -220,12 +239,9 @@ class FeedbackPlugin extends Plugin {
      *
      * @see Plugin::uninstall()
      */
-    function uninstall() {
-        $errors = array();
-// Do we send an email to the admin telling him about the space used by the archive?
+    function uninstall(&$errors) {
         global $ost;
         $ost->alertAdmin(__('Plugin: Feedback has been uninstalled'), __("You don't want to know what they think any more?"), true);
-
         parent::uninstall($errors);
     }
 
@@ -233,7 +249,7 @@ class FeedbackPlugin extends Plugin {
      * Plugins seem to want this.
      */
     public function getForm() {
-        return array();
+        return [];
     }
 
 }

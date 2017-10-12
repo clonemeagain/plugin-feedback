@@ -2,8 +2,10 @@
 /** Put the send button on the right, a bit bigger than default */
 button.feedback-sendButton {
     padding: 8px;
-    float:right;
-    margin-right:8px;
+    font-size:2em !important;
+}
+.ui-dialog-buttonset {
+    text-align: center;
 }
 /** Remove the style around the "button container"..  */
 .ui-dialog-buttonpane.ui-widget-content.ui-helper-clearfix{
@@ -14,14 +16,10 @@ button.feedback-sendButton {
 .feedback-input textarea {
     resize:both; 
     width: 100%;
-    min-height:220px;
+    min-height:100px;
     -webkit-box-sizing: border-box; /* <=iOS4, <= Android  2.3 */
     -moz-box-sizing: border-box; /* FF1+ */
     box-sizing: border-box; /* Chrome, IE8, Opera, Safari 5.1*/
-
-    width:100%;
-    box-sizing:border-box;
-    /*direction:rtl;*/
     display:block;
     max-width:100%;
     line-height:1.5;
@@ -38,8 +36,44 @@ button.feedback-sendButton {
     background:-moz-linear-gradient(#F9EFAF, #F7E98D);
     background:-webkit-linear-gradient(#F9EFAF, #F7E98D);
 }
-
+.feedback-input { 
+    margin-top:2em;
+    padding:10px;
+}
 /** Move the close button to the right as well */
 button.ui-button.ui-widget.ui-state-default.ui-corner-all.ui-button-icon-only.ui-dialog-titlebar-close {
     float: right; 
+}
+div.votegroup label{
+    padding: 20px;
+}
+div.votegroup {
+    margin: 10px;    
+    padding: 10px;
+    display: inline;
+    border: 1px solid #ccc;
+    margin-right:2em;
+    -webkit-box-shadow: 2px 2px 5px 0px rgba(194,194,194,1);
+    -moz-box-shadow: 2px 2px 5px 0px rgba(194,194,194,1);
+    box-shadow: 2px 2px 5px 0px rgba(194,194,194,1);
+}
+div.votegroup.green-border{
+    border-color: green;
+    margin-left:3em;
+}
+div.votegroup.red-border{
+    border-color: red;
+    margin-right:0;
+}
+
+input[type=radio] + label:hover {
+    font-style: italic;
+} 
+input[type=radio]:checked + label {
+    color: black;
+    font-style: normal;
+} 
+
+.votegroup input {
+    display: none;
 }
