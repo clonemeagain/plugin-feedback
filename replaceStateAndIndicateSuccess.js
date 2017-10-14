@@ -5,15 +5,8 @@
  * Also, injects the status of the feedback into the page, and shows
  * a "More details" box for extra details. 
  */
-// Clear the url part from the back-button.. 
-// ergo: View Source won't show this script
-var newhref = document.location.href.replace(/(.*)&feedback=.+/, '$1');
-if (window.history.replaceState) {
-    //prevents browser from storing history with each change:
-    window.history.replaceState({}, document.title, newhref); // we were never here..
-    window.history.pushState({}, document.title, newhref);
-}
 (function ($) {
+    var newhref = document.location.href.replace(/(.*)&feedback=.+/, '$1');
     var data = '#CONFIG#';
     $(document).on('ready',
             function () {
@@ -26,7 +19,7 @@ if (window.history.replaceState) {
                     };
                 };
                 console.log(data);
-                $('#ticketInfo').append('<div id="dialog" style="display:none;">' +
+                $('#content').append('<div id="dialog" style="display:none;">' +
                         '<div class="feedback-heading" style="padding:10px;">' + data.dialog_heading + '</div>' +
                         '<div class="votegroup green-border"><input type="radio" name="vote" value="up" id="upvote"/>' +
                         '<label for="upvote">' + data.options.up + '</label></div>' +
@@ -37,16 +30,34 @@ if (window.history.replaceState) {
                         '<div class="feedback-input"><textarea name="text" value="" placeholder="' + data.options.placeholder + '"></textarea></div>' +
                         '</div>');
                 // The page has loaded, we're showing the modal, let's save the feedback now, and if they update the input and send, we'll update it.
-                $.ajax({type: 'post', url: data.url, data: getData()});
+                $.ajax({type: 'post', url: data.url, data: getData(),
+                    success: function () {
+                        // all good man
+                        // Clear the url part from the back-button.. 
+                        // ergo: View Source won't show this script
+                        if (window.history.replaceState && false) {
+                            //prevents browser from storing history with each change:
+                            window.history.replaceState({}, document.title, newhref); // we were never here..
+                            window.history.pushState({}, document.title, newhref);
+                        }
+                    },
+                    error: function (xhr) {
+                        console.log(xhr);
+                        $('button.feedback-sendButton').attr('disabled', true);
+                        $('div.feedback-input').append('<span ')
+                                .append('You need to <a target="_blank" style="text-decoration:underline;" href="' + newhref + '"> login</a> to post this, just refresh this page when you\'re logged in.');
+                    }
+                });
 
                 // Select the selected one, but listen if it changes
-                $('.votegroup').on('click', function (e) {
+                $('.votegroup label').on('click', function (e) {
                     var elem = $(e.target);
-                    data.vote = elem.val();
+                    data.vote = elem.parent().find('input').val();
+                    $('div.feedback-heading').html(data.dialog_headings[data.vote]);
                     $('.votegroup span.check').remove();
                     elem.parent().prepend('<span class="check">&#x2714;</span>');
                 });
-                $('#' + data.vote + 'vote').click();
+                $('label[for=' + data.vote + 'vote]').click();
                 // Show the modal dialog to the user asking for additional comments:
                 $('#dialog').dialog({
                     modal: true,
@@ -55,7 +66,7 @@ if (window.history.replaceState) {
                     show: "blind",
                     hide: "blind",
                     closeText: '', //data.close_button_text,
-                    position: {my: "center", at: "center", of: '#ticketInfo'},
+                    position: {my: "center", at: "center", of: '#content'},
                     buttons: [{
                             text: data.send_button_text,
                             icon: "ui-icon-heart",
@@ -69,7 +80,7 @@ if (window.history.replaceState) {
                                         $('#ticketInfo').after('<div style="background-color: lightgreen; border: 1px solid green; padding:10px;">' + data.good + '</div>');
                                     },
                                     error: function (xhr) {
-                                        $('#ticketInfo').after('<div style="background-color: pink; border: 1px solid red; padding:10px;">' + data.bad + '</div>');
+                                        $('#ticketInfo').after('<div style="background-color: pink; border: 1px solid red; padding:10px;">' + data.bad + xhr.responseText + '</div>');
                                         console.log(xhr);
                                     },
                                     complete: function () {

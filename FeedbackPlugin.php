@@ -39,11 +39,13 @@ class FeedbackPlugin extends Plugin {
           The goal of this part is to inject a script that will make
           a form that will submit the actual vote.
          */
-        if (isset($_GET['feedback']) && isset($_SESSION['_auth']['user-ticket'])) {
+        if (isset($_GET['feedback'])) {
             $this->doShowAction();
-        } elseif (isset($_SESSION) && isset($_GET['savefeedback']) && isset($_POST['vote'])) {
+        }
+        elseif (isset($_SESSION) && isset($_GET['savefeedback']) && isset($_POST['vote'])) {
             $this->doSaveAction();
-        } else {
+        }
+        else {
             // Let's load up our addition to the ticket variables.. 
             // assumes the pull request has been loaded.. but.. shit.
             Signal::connect('replace.variables', function($replacer, &$data) {
@@ -65,18 +67,25 @@ class FeedbackPlugin extends Plugin {
             // todo: Validate that is the correct path
             $data->ticket_id = $_SESSION['_auth']['user-ticket'];
         }
-        $data->vote             = filter_input(INPUT_GET, 'feedback');
-        $data->good             = $c->get('good-text');
-        $data->bad              = $c->get('bad-text');
-        $data->dialog_heading   = $c->get('dialog-heading-' . $data->vote);
-        $data->send_button_text = __('Send');
-        $data->url              = str_replace('feedback=' . $data->vote, 'savefeedback', $_SERVER['REQUEST_URI']);
-
+        $data->vote    = filter_input(INPUT_GET, 'feedback');
         // Ok, now we need to get the field config for the choice, use the
         // display names as the labels and build radio buttons
         // because I just saw a great feedback form and want to 
         // emulate it.. it was beautiful!
         $data->options = $this->getFormOptions($data->ticket_id);
+        if (!isset($data->options[$data->vote])) {
+            // the input value isn't a valid form choice:
+            $data->vote = 'meh';
+        }
+        $data->good             = $c->get('good-text');
+        $data->bad              = $c->get('bad-text');
+        $data->dialog_headings  = [
+            'up'   => $c->get('dialog-heading-up'),
+            'down' => $c->get('dialog-heading-down'),
+            'meh'  => $c->get('dialog-heading-meh')
+        ];
+        $data->send_button_text = __('Send');
+        $data->url              = str_replace('feedback=' . $data->vote, 'savefeedback', $_SERVER['REQUEST_URI']);
 
         // Need a way of indicating success/failure without breaking anything..
         // And, hopefully prevents the back button from resubmitting.
@@ -105,7 +114,8 @@ class FeedbackPlugin extends Plugin {
             $state = $this->saveFeedback();
             if ($state === TRUE) {
                 Http::response(200, '{}', 'text/json');
-            } else {
+            }
+            else {
                 $response          = new \stdClass();
                 $response->message = $state;
                 Http::response(400, json_encode($response), 'text/json');
@@ -122,10 +132,10 @@ class FeedbackPlugin extends Plugin {
     private function getFormOptions($ticket_id) {
         // Setup the default options:
         $options = [
-            'help' => '',
-            'up'   => __('Great'),
-            'meh'  => __('Okay'),
-            'down' => __('Not Good'),
+            'placeholder' => __('Message'),
+            'up'          => __('Great'),
+            'meh'         => __('Okay'),
+            'down'        => __('Not Good'),
         ];
         // Get the Ticket from the User number (not the id, the number):
         $t       = Ticket::lookup(['number' => $ticket_id]);
@@ -145,7 +155,7 @@ class FeedbackPlugin extends Plugin {
                 $options = $field->getChoices();
             }
         }
-        $options ['placeholder'] = __('Message');
+        $options ['placeholder'] = __('Message'); // TODO: Figure out what that option is actually called.. grrr
         return $options;
     }
 
@@ -171,7 +181,8 @@ class FeedbackPlugin extends Plugin {
         if ($ticket_id && isset($_SESSION['csrf']['token']) && $_SESSION['csrf']['token'] == $token) {
             // good
             $this->log("Token was right!");
-        } else {
+        }
+        else {
             return __('Access Denied. Possibly invalid ticket ID');
         }
         // Validate the Ticket:
@@ -204,7 +215,8 @@ class FeedbackPlugin extends Plugin {
                     $ticket->logActivity(__('Feedback received') . ': ' . $choices[$vote], $comments);
                     $field_feedback->setValue($vote, true);
                     $changed = TRUE;
-                } else {
+                }
+                else {
                     return __("Invalid feedback.. ");
                 }
             }
